@@ -20,15 +20,15 @@ object Player {
 
   val idExtractor: ShardRegion.ExtractEntityId = {
     case gb: GetBalance => (gb.playerName, gb)
-    case d: GetBalance => (d.playerName, d)
-    case w: GetBalance => (w.playerName, w)
+    case d: Deposit => (d.playerName, d)
+    case w: Withdraw => (w.playerName, w)
     case r: Rollback => (r.playerName, r)
   }
 
   val shardResolver: ShardRegion.ExtractShardId = {
     case gb: GetBalance => (gb.playerName.hashCode % 100).toString
-    case d: GetBalance => (d.playerName.hashCode % 100).toString
-    case w: GetBalance => (w.playerName.hashCode % 100).toString
+    case d: Deposit => (d.playerName.hashCode % 100).toString
+    case w: Withdraw => (w.playerName.hashCode % 100).toString
     case r: Rollback => (r.playerName.hashCode % 100).toString
   }
 
@@ -55,6 +55,7 @@ class Player extends PersistentActor with ActorLogging {
       balance += event.amount
       transactions += event.id
     }
+    sender() ! balance
   }
 
   override def receiveRecover: Receive = {
@@ -62,8 +63,8 @@ class Player extends PersistentActor with ActorLogging {
   }
 
   override def receiveCommand: Receive = {
-    case Deposit(playerName, id, amount) => persist(BalanceChanged(id, +amount))(updateState)
-    case Withdraw(playerName, id, amount) => persist(BalanceChanged(id, -amount))(updateState)
+    case Deposit(_, id, amount) => persist(BalanceChanged(id, +amount))(updateState)
+    case Withdraw(_, id, amount) => persist(BalanceChanged(id, -amount))(updateState)
     case GetBalance(_) => sender() ! balance
     case ReceiveTimeout => context.parent ! Passivate(stopMessage = Stop)
     case Stop => context.stop(self)

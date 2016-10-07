@@ -1,4 +1,4 @@
-import Player.GetBalance
+import Player.{Deposit, GetBalance, Withdraw}
 import akka.actor.ActorSystem
 import akka.cluster.sharding.ClusterSharding
 import akka.http.scaladsl.server.Directives._
@@ -8,8 +8,8 @@ import io.circe.generic.auto._
 import io.circe.syntax._
 import akka.pattern.ask
 import akka.util.Timeout
-import scala.concurrent.duration._
 
+import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 
 class HttpService(system: ActorSystem)(implicit executionContext: ExecutionContext) extends CirceSupport with SecurityDirectives {
@@ -22,20 +22,57 @@ class HttpService(system: ActorSystem)(implicit executionContext: ExecutionConte
         pathEndOrSingleSlash {
           post {
             entity(as[BalanceRequest]) { req =>
-              complete(handle(req).map(_.asJson))
+              complete(balance(req).map(_.asJson))
             }
           }
         }
-      }
-    }
+      } ~
+        path("deposit") {
+          pathEndOrSingleSlash {
+            post {
+              entity(as[DepositRequest]) { req =>
+                complete(deposit(req).map(_.asJson))
+              }
+            }
+          }
+        } ~
+        path("withdraw") {
+          pathEndOrSingleSlash {
+            post {
+              entity(as[WithdrawRequest]) { req =>
+                complete(withdraw(req).map(_.asJson))
+              }
+            }
+          }
+        }
 
-  def handle(req: BalanceRequest): Future[BalanceResponse] = {
-    implicit val timeout = Timeout(5 seconds)
-    (playerRegion ? GetBalance(req.playerName)).mapTo[Int].map(balance => BalanceResponse(balance))
-  }
+    }
 
   case class BalanceRequest(playerName: String)
 
   case class BalanceResponse(balance: Int)
 
+  def balance(req: BalanceRequest): Future[BalanceResponse] = {
+    implicit val timeout = Timeout(5 seconds)
+    (playerRegion ? GetBalance(req.playerName)).mapTo[Int].map(balance => BalanceResponse(balance))
+  }
+
+
+  case class DepositRequest(playerName: String, id: String, amount: Int)
+
+  case class DepositResponse(balance: Int)
+
+  def deposit(req: DepositRequest): Future[DepositResponse] = {
+    implicit val timeout = Timeout(5 seconds)
+    (playerRegion ? Deposit(req.playerName, req.id, req.amount)).mapTo[Int].map(balance => DepositResponse(balance))
+  }
+
+  case class WithdrawRequest(playerName: String, id: String, amount: Int)
+
+  case class WithdrawResponse(balance: Int)
+
+  def withdraw(req: WithdrawRequest): Future[WithdrawResponse] = {
+    implicit val timeout = Timeout(5 seconds)
+    (playerRegion ? Withdraw(req.playerName, req.id, req.amount)).mapTo[Int].map(balance => WithdrawResponse(balance))
+  }
 }
