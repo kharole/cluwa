@@ -4,6 +4,8 @@ version := "1.0"
 
 scalaVersion := "2.11.8"
 
+resolvers += "krasserm at bintray" at "http://dl.bintray.com/krasserm/maven"
+
 libraryDependencies ++= {
   val akkaV = "2.4.4"
   val scalaTestV = "3.0.0-M15"
@@ -21,6 +23,7 @@ libraryDependencies ++= {
     "com.typesafe.akka" %% "akka-multi-node-testkit" % akkaV,
     "org.iq80.leveldb" % "leveldb" % "0.7",
     "org.fusesource.leveldbjni" % "leveldbjni-all" % "1.8",
+    "com.github.krasserm" %% "akka-persistence-cassandra-3x" % "0.6",
 
     "io.circe" %% "circe-core" % circeV,
     "io.circe" %% "circe-generic" % circeV,
