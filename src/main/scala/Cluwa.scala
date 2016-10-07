@@ -1,7 +1,6 @@
 import akka.actor.{ActorSystem, Props}
 import akka.cluster.sharding.{ClusterSharding, ClusterShardingSettings}
 import akka.http.scaladsl.Http
-import akka.persistence.journal.leveldb.SharedLeveldbStore
 import akka.stream.ActorMaterializer
 import com.typesafe.config.ConfigFactory
 
@@ -21,13 +20,13 @@ object Cluwa {
     implicit val executionContext = system.dispatcher
 
     ClusterSharding(system).start(
-      typeName = "Player",
+      typeName = Player.shardName,
       entityProps = Props[Player],
       settings = ClusterShardingSettings(system),
       extractEntityId = Player.idExtractor,
       extractShardId = Player.shardResolver)
 
-    val httpService = new HttpService
+    val httpService = new HttpService(system)
     val restPort: Int = 10000 + port
     val bindingFuture = Http().bindAndHandle(httpService.routes, "localhost", restPort)
 

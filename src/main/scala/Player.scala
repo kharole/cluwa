@@ -31,6 +31,9 @@ object Player {
     case w: GetBalance => (w.playerName.hashCode % 100).toString
     case r: Rollback => (r.playerName.hashCode % 100).toString
   }
+
+  val shardName = "Player"
+
 }
 
 final case class BalanceChanged(id: String, amount: Int)
