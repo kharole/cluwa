@@ -1,4 +1,4 @@
-import Player.{Deposit, GetBalance, Withdraw}
+import Player.{Deposit, GetBalance, Rollback, Withdraw}
 import akka.actor.SupervisorStrategy.Stop
 import akka.actor.{ActorLogging, Props, ReceiveTimeout}
 import akka.cluster.sharding.ShardRegion
@@ -16,7 +16,7 @@ object Player {
 
   case class Withdraw(playerName: String, id: String, amount: Int)
 
-  case class Rollback(playerName: String, id: String, amount: Int)
+  case class Rollback(playerName: String, id: String)
 
   val idExtractor: ShardRegion.ExtractEntityId = {
     case gb: GetBalance => (gb.playerName, gb)
@@ -38,6 +38,8 @@ object Player {
 
 final case class BalanceChanged(id: String, amount: Int)
 
+final case class RolledBack(id: String)
+
 class Player extends PersistentActor with ActorLogging {
 
   import ShardRegion.Passivate
@@ -47,24 +49,36 @@ class Player extends PersistentActor with ActorLogging {
 
   override def persistenceId: String = "Player-" + self.path.name
 
-  var balance = 123
-  val transactions = collection.mutable.Set[String]()
+  var balance = 0
+  val transactions = collection.mutable.Map[String, Int]()
+  val rolledback = collection.mutable.Set[String]()
 
-  def updateState(event: BalanceChanged): Unit = {
+  def processTx(event: BalanceChanged): Unit = {
     if (!transactions.contains(event.id)) {
-      balance += event.amount
-      transactions += event.id
+      if (!rolledback.contains(event.id))
+        balance += event.amount
+      transactions.put(event.id, event.amount)
     }
     sender() ! balance
   }
 
+  def cancelTx(event: RolledBack): Unit = {
+    if (!rolledback.contains(event.id) &&
+      transactions.contains(event.id)) {
+      balance -= transactions(event.id)
+    }
+    rolledback += event.id
+    sender() ! balance
+  }
+
   override def receiveRecover: Receive = {
-    case evt: BalanceChanged => updateState(evt)
+    case evt: BalanceChanged => processTx(evt)
   }
 
   override def receiveCommand: Receive = {
-    case Deposit(_, id, amount) => persist(BalanceChanged(id, +amount))(updateState)
-    case Withdraw(_, id, amount) => persist(BalanceChanged(id, -amount))(updateState)
+    case Deposit(_, id, amount) => persist(BalanceChanged(id, +amount))(processTx)
+    case Withdraw(_, id, amount) => persist(BalanceChanged(id, -amount))(processTx)
+    case Rollback(_, id) => persist(RolledBack(id))(cancelTx)
     case GetBalance(_) => sender() ! balance
     case ReceiveTimeout => context.parent ! Passivate(stopMessage = Stop)
     case Stop => context.stop(self)

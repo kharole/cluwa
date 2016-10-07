@@ -1,4 +1,4 @@
-import Player.{Deposit, GetBalance, Withdraw}
+import Player.{Deposit, GetBalance, Rollback, Withdraw}
 import akka.actor.ActorSystem
 import akka.cluster.sharding.ClusterSharding
 import akka.http.scaladsl.server.Directives._
@@ -44,6 +44,15 @@ class HttpService(system: ActorSystem)(implicit executionContext: ExecutionConte
               }
             }
           }
+        } ~
+        path("rollback") {
+          pathEndOrSingleSlash {
+            post {
+              entity(as[RollbackRequest]) { req =>
+                complete(rollback(req).map(_.asJson))
+              }
+            }
+          }
         }
 
     }
@@ -74,5 +83,14 @@ class HttpService(system: ActorSystem)(implicit executionContext: ExecutionConte
   def withdraw(req: WithdrawRequest): Future[WithdrawResponse] = {
     implicit val timeout = Timeout(5 seconds)
     (playerRegion ? Withdraw(req.playerName, req.id, req.amount)).mapTo[Int].map(balance => WithdrawResponse(balance))
+  }
+
+  case class RollbackRequest(playerName: String, id: String)
+
+  case class RollbackResponse(balance: Int)
+
+  def rollback(req: RollbackRequest): Future[RollbackResponse] = {
+    implicit val timeout = Timeout(5 seconds)
+    (playerRegion ? Rollback(req.playerName, req.id)).mapTo[Int].map(balance => RollbackResponse(balance))
   }
 }
